@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>CYBER TARGET LOCK SYSTEM - MOBILE</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+
+body {
+
+margin: 0;
+
+background-color: #000;
+
+color: #00ff00;
+
+font-family: 'Orbitron', sans-serif;
+
+overflow: hidden;
+
+touch-action: none;
+
+}
+
+.hud-container {
+
+position: relative;
+
+width: 100vw;
+
+height: 100vh;
+
+display: flex;
+
+justify-content: center;
+
+align-items: center;
+
+background: #000;
+
+}
+
+video {
+
+width: 100%;
+
+height: 100%;
+
+object-fit: cover; /* 画面いっぱいに表示 */
+
+}
+
+canvas {
+
+position: absolute;
+
+top: 0;
+
+left: 0;
+
+width: 100%;
+
+height: 100%;
+
+pointer-events: none;
+
+}
+
+.overlay-ui {
+
+position: absolute;
+
+inset: 0;
+
+pointer-events: none;
+
+z-index: 10;
+
+border: 10px solid rgba(0, 255, 0, 0.1);
+
+}
+
+.scan-line {
+
+position: absolute;
+
+width: 100%;
+
+height: 2px;
+
+background: rgba(0, 255, 0, 0.2);
+
+box-shadow: 0 0 8px #00ff00;
+
+animation: scan 4s linear infinite;
+
+}
+
+@keyframes scan {
+
+0% { top: 0; }
+
+100% { top: 100%; }
+
+}
+
+.loading-screen {
+
+position: fixed;
+
+inset: 0;
+
+background: #000;
+
+display: flex;
+
+flex-direction: column;
+
+justify-content: center;
+
+align-items: center;
+
+z-index: 100;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+
+
+<div id="loading" class="loading-screen">
+
+<div class="text-xl mb-4 animate-pulse">BOOTING HUD SYSTEM...</div>
+
+<div id="load-status" class="text-[10px] opacity-50 uppercase">Loading Neural Assets</div>
+
+</div>
+
+
+
+<div class="hud-container">
+
+<video id="video" autoplay muted playsinline></video>
+
+<canvas id="overlay"></canvas>
+
+
+<div class="overlay-ui">
+
+<div class="scan-line"></div>
+
+
+<!-- Floating HUD elements -->
+
+<div class="absolute left-4 top-10 flex flex-col gap-2">
+
+<div class="text-[8px] opacity-70">SENSORS</div>
+
+<div class="w-12 h-1 bg-green-900"><div class="h-full bg-green-400 w-3/4 animate-pulse"></div></div>
+
+</div>
+
+
+
+<!-- Left HUD Info -->
+
+<div class="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-6 scale-75 origin-left">
+
+<div class="border-l-2 border-green-500 pl-3">
+
+<div class="text-[8px] opacity-60">ALT</div>
+
+<div class="text-lg font-bold">24.5K</div>
+
+</div>
+
+<div class="border-l-2 border-green-500 pl-3">
+
+<div class="text-[8px] opacity-60">SPD</div>
+
+<div class="text-lg font-bold">M 1.2</div>
+
+</div>
+
+</div>
+
+
+
+<!-- Right HUD Info -->
+
+<div class="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col gap-6 text-right scale-75 origin-right">
+
+<div class="border-r-2 border-green-500 pr-3">
+
+<div class="text-[8px] opacity-60">MODE</div>
+
+<div class="text-lg font-bold">AUTO</div>
+
+</div>
+
+<div class="border-r-2 border-green-500 pr-3">
+
+<div class="text-[8px] opacity-60">STATUS</div>
+
+<div id="weapon-status" class="text-lg font-bold text-green-500">SEARCHING</div>
+
+</div>
+
+</div>
+
+
+
+<!-- Bottom UI -->
+
+<div class="absolute bottom-10 w-full text-center px-10">
+
+<div class="text-[8px] tracking-[0.3em] opacity-40">MOBILE TARGETING SYSTEM v2.5</div>
+
+<div class="mt-2 h-[1px] bg-gradient-to-r from-transparent via-green-500 to-transparent"></div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<script>
+
+const video = document.getElementById('video');
+
+const loading = document.getElementById('loading');
+
+const overlay = document.getElementById('overlay');
+
+const weaponStatus = document.getElementById('weapon-status');
+
+const loadStatus = document.getElementById('load-status');
+
+
+
+async function setup() {
+
+try {
+
+loadStatus.innerText = "Connecting to Neural Net...";
+
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+
+await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+
+loadStatus.innerText = "Awaiting Camera Access...";
+
+startVideo();
+
+} catch (err) {
+
+loadStatus.innerText = "Critical Error: Model Fail";
+
+console.error(err);
+
+}
+
+}
+
+
+
+function startVideo() {
+
+// スマホの背面カメラを優先的に選ぶ設定 (facingMode: environment)
+
+const constraints = {
+
+video: {
+
+facingMode: 'environment',
+
+width: { ideal: 1280 },
+
+height: { ideal: 720 }
+
+}
+
+};
+
+
+
+navigator.mediaDevices.getUserMedia(constraints)
+
+.then(stream => {
+
+video.srcObject = stream;
+
+loading.style.display = 'none';
+
+})
+
+.catch(err => {
+
+console.error(err);
+
+alert("Camera blocked. Please enable permissions.");
+
+});
+
+}
+
+
+
+video.addEventListener('play', () => {
+
+const canvasCtx = overlay.getContext('2d');
+
+
+function loop() {
+
+if (video.paused || video.ended) return;
+
+
+// 描画サイズを現在のビデオ表示サイズに合わせる
+
+const width = video.offsetWidth;
+
+const height = video.offsetHeight;
+
+if (overlay.width !== width || overlay.height !== height) {
+
+overlay.width = width;
+
+overlay.height = height;
+
+}
+
+
+
+// 顔認識実行
+
+faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+
+.then(detections => {
+
+// 表示サイズに合わせて座標変換
+
+const displaySize = { width, height };
+
+const videoSize = { width: video.videoWidth, height: video.videoHeight };
+
+
+// カバー設定(object-fit: cover)に対応するための計算
+
+const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+
+
+canvasCtx.clearRect(0, 0, width, height);
+
+
+
+if (resizedDetections.length > 0) {
+
+weaponStatus.innerText = "LOCK ON";
+
+weaponStatus.className = "text-lg font-bold text-red-500 animate-pulse";
+
+} else {
+
+weaponStatus.innerText = "SEARCHING";
+
+weaponStatus.className = "text-lg font-bold text-green-500";
+
+}
+
+
+
+resizedDetections.forEach(detection => {
+
+const { x, y, width: boxW, height: boxH } = detection.box;
+
+drawTargetBox(canvasCtx, x, y, boxW, boxH);
+
+});
+
+
+requestAnimationFrame(loop);
+
+});
+
+}
+
+loop();
+
+});
+
+
+
+function drawTargetBox(ctx, x, y, w, h) {
+
+const t = Math.min(w, h) * 0.2;
+
+ctx.strokeStyle = '#00ff00';
+
+ctx.lineWidth = 2;
+
+
+
+// Corners
+
+ctx.beginPath();
+
+ctx.moveTo(x, y + t); ctx.lineTo(x, y); ctx.lineTo(x + t, y); // TL
+
+ctx.moveTo(x + w - t, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + t); // TR
+
+ctx.moveTo(x, y + h - t); ctx.lineTo(x, y + h); ctx.lineTo(x + t, y + h); // BL
+
+ctx.moveTo(x + w - t, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - t); // BR
+
+ctx.stroke();
+
+
+
+// Center Mark
+
+ctx.beginPath();
+
+ctx.arc(x + w/2, y + h/2, 3, 0, Math.PI * 2);
+
+ctx.stroke();
+
+
+
+// Stats
+
+ctx.fillStyle = '#00ff00';
+
+ctx.font = '8px Orbitron';
+
+ctx.fillText(`ID: T-800`, x + 5, y - 10);
+
+ctx.fillText(`POS: ${Math.round(x)},${Math.round(y)}`, x + 5, y - 2);
+
+}
+
+
+
+setup();
+
+</script>
+
+</body>
+
+</html>
+
+
+
